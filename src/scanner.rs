@@ -171,10 +171,6 @@ mod tests {
             .map(|x| x.t_type)
             .collect();
 
-        println!("actual: {:?}", actual_tokens);
-
-        println!("expected: {:?}", expected_tokens);
-
         assert!(do_cols_match(&actual_tokens, &expected_tokens));
     }
 }
