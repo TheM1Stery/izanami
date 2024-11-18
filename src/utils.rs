@@ -1,5 +1,8 @@
+use std::ops::{Bound, RangeBounds};
+
 pub trait StringUtils {
     fn substring(&self, start: usize, end: usize) -> &str;
+    fn slice(&self, range: impl RangeBounds<usize>) -> &str;
 }
 
 impl StringUtils for String {
@@ -32,5 +35,18 @@ impl StringUtils for String {
             }
         }
         &self[byte_start..byte_end]
+    }
+
+    fn slice(&self, range: impl RangeBounds<usize>) -> &str {
+        let start = match range.start_bound() {
+            Bound::Included(bound) | Bound::Excluded(bound) => *bound,
+            Bound::Unbounded => 0,
+        };
+        let len = match range.end_bound() {
+            Bound::Included(bound) => *bound + 1,
+            Bound::Excluded(bound) => *bound,
+            Bound::Unbounded => self.len(),
+        } - start;
+        self.substring(start, len)
     }
 }

@@ -47,11 +47,18 @@ pub enum TokenType {
     EOF,
 }
 
+// i've seen this implementation in the wild
+#[derive(Debug, Clone, PartialEq)]
+pub enum LiteralType {
+    String(String),
+    Number(f64),
+}
+
 #[derive(Debug)]
 pub struct Token {
     pub t_type: TokenType,
     pub lexeme: String,
-    pub literal: Option<Box<dyn std::any::Any>>,
+    pub literal: Option<LiteralType>,
     pub line: usize,
 }
 

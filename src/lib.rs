@@ -34,7 +34,7 @@ pub fn run_prompt() -> Result<(), Box<dyn Error>> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RloxError {
     msg: String,
     line: usize,

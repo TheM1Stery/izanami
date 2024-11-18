@@ -1,7 +1,7 @@
 use std::{iter::Peekable, mem, str::Chars};
 
 use crate::{
-    token::{Token, TokenType},
+    token::{LiteralType, Token, TokenType},
     utils::StringUtils,
     RloxError,
 };
@@ -37,14 +37,11 @@ impl Scanner {
     // could be accomplished. TODO!
     fn scan_tokens(&mut self) -> Result<&Vec<Token>, Vec<RloxError>> {
         let mut errors = Vec::new();
-        while let Some(character) = self.advance() {
+        while self.peek().is_some() {
             self.start = self.current;
-            let result = self.scan_token(character);
+            let result = self.scan_token();
             if let Err(e) = result {
-                errors.push(RloxError {
-                    msg: e.to_string(),
-                    line: self.line,
-                });
+                errors.push(e);
             }
         }
 
@@ -62,11 +59,12 @@ impl Scanner {
         Ok(&self.tokens)
     }
 
-    //fn is_at_end(&self) -> bool {
-    //    self.current >= self.source.len()
-    //}
+    fn is_at_end(&self) -> bool {
+        self.current >= self.source.len()
+    }
 
-    fn scan_token(&mut self, token: char) -> Result<(), &'static str> {
+    fn scan_token(&mut self) -> Result<(), RloxError> {
+        let token = self.advance().unwrap();
         let mut error = Ok(());
 
         match token {
@@ -88,18 +86,24 @@ impl Scanner {
             '<' => self.add_token(TokenType::Less),
             '>' if self.peek_and_match('>') => self.add_token(TokenType::GreaterEqual),
             '>' => self.add_token(TokenType::Greater),
-            // checking for comments and just advance the iterator
+            // checking for comments and just advance the iterator if it's a comment
             '/' if self.peek_and_match('/') => {
                 while self.peek().is_some_and(|x| x != '\n') {
                     self.advance();
                 }
             }
             '/' => self.add_token(TokenType::Slash),
-
+            '"' => error = self.string(),
+            '0'..='9' => self.number(),
             ' ' | '\r' | '\t' => (),
             '\n' => self.line += 1,
 
-            _ => error = Err("Unexpected character"),
+            _ => {
+                error = Err(RloxError {
+                    msg: "Unexpected character".to_string(),
+                    line: self.line,
+                })
+            }
         };
 
         error
@@ -114,8 +118,8 @@ impl Scanner {
         self.add_token_literal(t_type, None)
     }
 
-    fn add_token_literal(&mut self, t_type: TokenType, literal: Option<Box<dyn std::any::Any>>) {
-        let text = self.source.substring(self.start, self.current);
+    fn add_token_literal(&mut self, t_type: TokenType, literal: Option<LiteralType>) {
+        let text = self.source.slice(self.start..self.current);
         self.tokens.push(Token {
             t_type,
             lexeme: text.to_string(),
@@ -128,6 +132,12 @@ impl Scanner {
         self.iter.peek().copied()
     }
 
+    fn peek_double(&mut self) -> Option<char> {
+        let mut copied_iterator = self.iter.clone();
+        copied_iterator.next();
+        copied_iterator.peek().copied()
+    }
+
     fn peek_and_match(&mut self, expected: char) -> bool {
         let peek = self.peek();
         if peek.is_some_and(|x| x == expected) {
@@ -136,6 +146,59 @@ impl Scanner {
         }
 
         false
+    }
+
+    fn string(&mut self) -> Result<(), RloxError> {
+        let start_line = self.line;
+        while self.peek().is_some_and(|x| x != '"') {
+            if self.peek().is_some_and(|x| x == '\n') {
+                self.line += 1;
+            }
+            self.advance();
+        }
+
+        if self.peek().is_none() {
+            let error = RloxError {
+                msg: "Unterminated string".to_string(),
+                line: start_line,
+            };
+            return Err(error);
+        }
+
+        self.advance();
+
+        // clean out the quotes and wrap it in a string literal type
+        let value = LiteralType::String(
+            self.source
+                .slice(self.start + 1..self.current - 1)
+                .to_string(),
+        );
+
+        self.add_token_literal(TokenType::String, Some(value));
+
+        Ok(())
+    }
+
+    fn number(&mut self) {
+        while matches!(self.peek(), Some('0'..='9')) {
+            self.advance();
+        }
+
+        if self.peek().is_some_and(|x| x == '.') && matches!(self.peek_double(), Some('0'..='9')) {
+            self.advance();
+
+            while matches!(self.peek_double(), Some('0'..='9')) {
+                self.advance();
+            }
+        }
+
+        let number: f64 = self
+            .source
+            .slice(self.start..=self.current)
+            .parse()
+            .expect("There shouldn't be any errors. Please check");
+
+        self.add_token_literal(TokenType::Number, Some(LiteralType::Number(number)));
     }
 }
 
@@ -172,5 +235,99 @@ mod tests {
             .collect();
 
         assert!(do_cols_match(&actual_tokens, &expected_tokens));
+    }
+
+    #[test]
+    fn correct_string_scan() {
+        let value = r#"
+            // string!
+            "salam!""#;
+
+        let mut scanner = Scanner::new(value.to_string());
+
+        let tokens: Vec<&Token> = scanner
+            .scan_tokens()
+            .expect("Should not be an error!")
+            .iter()
+            .filter(|x| matches!(x.t_type, TokenType::String))
+            .collect();
+
+        let actual = tokens[0];
+
+        let expected = LiteralType::String("salam!".to_string());
+
+        assert_eq!(expected, actual.literal.as_ref().unwrap().clone());
+    }
+
+    #[test]
+    fn error_string_scan() {
+        let value = r#"
+            // Unterminated string bro wtf
+            "salam
+
+            (){} {}"#
+            .to_string();
+
+        let mut scanner = Scanner::new(value);
+
+        let expected_error = RloxError {
+            msg: "Unterminated string".to_string(),
+            line: 3,
+        };
+
+        let tokens = scanner.scan_tokens().expect_err("Should be an error");
+
+        let actual_error = tokens
+            .iter()
+            .find(|e| e.msg == "Unterminated string")
+            .expect("Error not found. There should be an error");
+
+        assert_eq!(expected_error, actual_error.clone());
+    }
+
+    #[test]
+    fn correct_whole_number_scan() {
+        let value = r#"
+            // number test
+            123"#
+            .to_string();
+
+        let mut scanner = Scanner::new(value);
+
+        let expected_value = LiteralType::Number(123.0);
+
+        let tokens = scanner.scan_tokens().expect("There shouldn't be an error");
+
+        let token = tokens
+            .iter()
+            .find(|t| matches!(t.t_type, TokenType::Number))
+            .expect("There should be a number here. Couldn't find it");
+
+        let actual_value = &token.literal;
+
+        assert_eq!(expected_value, actual_value.as_ref().unwrap().clone())
+    }
+
+    #[test]
+    fn correct_fractional_number_scan() {
+        let value = r#"
+            // number test
+            123.456"#
+            .to_string();
+
+        let mut scanner = Scanner::new(value);
+
+        let expected_value = LiteralType::Number(123.456);
+
+        let tokens = scanner.scan_tokens().expect("There shouldn't be an error");
+
+        let token = tokens
+            .iter()
+            .find(|t| matches!(t.t_type, TokenType::Number))
+            .expect("There should be a number here. Couldn't find it");
+
+        let actual_value = &token.literal;
+
+        assert_eq!(expected_value, actual_value.as_ref().unwrap().clone())
     }
 }
