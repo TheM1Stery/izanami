@@ -28,8 +28,8 @@ pub fn run(src: &str) {
                 report(err.line, "", &err.msg);
             }
         }
-        Ok(_) => {
-            for token in tokens.unwrap() {
+        Ok(tokens) => {
+            for token in tokens {
                 println!("{}", token);
             }
         }
