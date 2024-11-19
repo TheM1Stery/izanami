@@ -16,7 +16,7 @@ pub struct Scanner {
 }
 
 impl Scanner {
-    fn new(source: String) -> Self {
+    pub fn new(source: String) -> Self {
         // the reason for using unsafe here is to have the ability to use utf-8 symbols
         // rust doesn't allow having both the iterator and iterable inside one
         // structure(understandably so bcs of reference invalidation)
@@ -35,7 +35,7 @@ impl Scanner {
 
     // this is so awful for me to write. This function needs to be not mutable in theory and it
     // could be accomplished. TODO!
-    fn scan_tokens(&mut self) -> Result<&Vec<Token>, Vec<RloxError>> {
+    pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, Vec<RloxError>> {
         let mut errors = Vec::new();
         while self.peek().is_some() {
             self.start = self.current;
@@ -94,10 +94,11 @@ impl Scanner {
             }
             '/' => self.add_token(TokenType::Slash),
             '"' => error = self.string(),
-            '0'..='9' => self.number(),
             ' ' | '\r' | '\t' => (),
             '\n' => self.line += 1,
 
+            '0'..='9' => self.number(),
+            'a'..='z' | 'A'..='Z' | '_' => self.identifier(),
             _ => {
                 error = Err(RloxError {
                     msg: "Unexpected character".to_string(),
@@ -199,6 +200,45 @@ impl Scanner {
             .expect("There shouldn't be any errors. Please check");
 
         self.add_token_literal(TokenType::Number, Some(LiteralType::Number(number)));
+    }
+
+    fn identifier(&mut self) {
+        while self.peek().is_some_and(is_alpha_numeric) {
+            self.advance();
+        }
+
+        let text_value = self.source.slice(self.start..self.current);
+        if let Some(identified_token) = get_identified_keyword(text_value) {
+            return self.add_token(identified_token);
+        }
+
+        self.add_token(TokenType::Identifier);
+    }
+}
+
+fn is_alpha_numeric(chr: char) -> bool {
+    matches!(chr ,'0'..='9'| '_' | 'a'..='z'|'A'..='Z')
+}
+
+fn get_identified_keyword(identifier: &str) -> Option<TokenType> {
+    match identifier {
+        "and" => Some(TokenType::And),
+        "class" => Some(TokenType::Class),
+        "else" => Some(TokenType::Else),
+        "false" => Some(TokenType::False),
+        "for" => Some(TokenType::For),
+        "fun" => Some(TokenType::Fun),
+        "if" => Some(TokenType::If),
+        "nil" => Some(TokenType::Nil),
+        "or" => Some(TokenType::OR),
+        "print" => Some(TokenType::Print),
+        "return" => Some(TokenType::Return),
+        "super" => Some(TokenType::Super),
+        "this" => Some(TokenType::This),
+        "true" => Some(TokenType::True),
+        "var" => Some(TokenType::Var),
+        "while" => Some(TokenType::While),
+        _ => None,
     }
 }
 
@@ -312,7 +352,7 @@ mod tests {
     fn correct_fractional_number_scan() {
         let value = r#"
             // number test
-            123.456"#
+            123.aaa"#
             .to_string();
 
         let mut scanner = Scanner::new(value);

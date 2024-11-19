@@ -4,6 +4,7 @@ use std::{
     io::{self, Write},
 };
 
+use scanner::Scanner;
 use token::Token;
 
 mod scanner;
@@ -13,24 +14,37 @@ mod utils;
 pub fn run_file(path: &str) -> Result<(), Box<dyn Error>> {
     let file = fs::read_to_string(path)?;
 
+    run(&file);
     Ok(())
 }
 
 pub fn run(src: &str) {
-    let tokens: Vec<Token> = Vec::new();
+    let mut scanner = Scanner::new(src.to_string());
+    let tokens = scanner.scan_tokens();
+
+    match tokens {
+        Err(ref errors) => {
+            for err in errors {
+                report(err.line, "", &err.msg);
+            }
+        }
+        Ok(_) => {
+            for token in tokens.unwrap() {
+                println!("{}", token);
+            }
+        }
+    }
 }
 
 pub fn run_prompt() -> Result<(), Box<dyn Error>> {
     let stdin = io::stdin();
     let input = &mut String::new();
-    print!("> ");
-    io::stdout().flush()?;
     loop {
         input.clear();
-        let _ = stdin.read_line(input)?;
-
         print!("> ");
         io::stdout().flush()?;
+        stdin.read_line(input)?;
+        run(input);
     }
 }
 
@@ -40,12 +54,6 @@ pub struct RloxError {
     line: usize,
 }
 
-impl RloxError {
-    pub fn error(line: i32, message: &str) {
-        report(line, "", message);
-    }
-}
-
-pub fn report(line: i32, location: &str, message: &str) {
+pub fn report(line: usize, location: &str, message: &str) {
     eprintln!("[line {line}] Error {location}: {message}");
 }
