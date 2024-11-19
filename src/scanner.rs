@@ -84,7 +84,7 @@ impl Scanner {
             '=' => self.add_token(TokenType::Equal),
             '<' if self.peek_and_match('=') => self.add_token(TokenType::LessEqual),
             '<' => self.add_token(TokenType::Less),
-            '>' if self.peek_and_match('>') => self.add_token(TokenType::GreaterEqual),
+            '>' if self.peek_and_match('=') => self.add_token(TokenType::GreaterEqual),
             '>' => self.add_token(TokenType::Greater),
             // checking for comments and just advance the iterator if it's a comment
             '/' if self.peek_and_match('/') => {
