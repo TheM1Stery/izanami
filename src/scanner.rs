@@ -92,6 +92,19 @@ impl Scanner {
                     self.advance();
                 }
             }
+            '/' if self.peek_and_match('*') => {
+                while self.peek().is_some_and(|c| c != '*')
+                    && self.peek_double().is_some_and(|c| c != '/')
+                {
+                    if self.peek().is_some_and(|c| c == '\n') {
+                        self.line += 1;
+                    }
+                    self.advance();
+                }
+                // advance twice to get rid of */
+                self.advance();
+                self.advance();
+            }
             '/' => self.add_token(TokenType::Slash),
             '"' => error = self.string(),
             ' ' | '\r' | '\t' => (),
