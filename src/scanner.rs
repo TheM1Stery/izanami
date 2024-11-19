@@ -187,14 +187,14 @@ impl Scanner {
         if self.peek().is_some_and(|x| x == '.') && matches!(self.peek_double(), Some('0'..='9')) {
             self.advance();
 
-            while matches!(self.peek_double(), Some('0'..='9')) {
+            while matches!(self.peek(), Some('0'..='9')) {
                 self.advance();
             }
         }
 
         let number: f64 = self
             .source
-            .slice(self.start..=self.current)
+            .slice(self.start..self.current)
             .parse()
             .expect("There shouldn't be any errors. Please check");
 
