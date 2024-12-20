@@ -7,6 +7,8 @@ use std::{
 use scanner::Scanner;
 use token::Token;
 
+mod ast;
+mod printer;
 mod scanner;
 mod token;
 mod utils;

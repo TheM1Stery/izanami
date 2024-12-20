@@ -54,12 +54,34 @@ pub enum LiteralType {
     Number(f64),
 }
 
+impl LiteralType {
+    pub fn string_literal(val: &str) -> LiteralType {
+        return LiteralType::String(val.to_string());
+    }
+
+    pub fn number_literal(val: f64) -> LiteralType {
+        return LiteralType::Number(val);
+    }
+}
+
 #[derive(Debug)]
 pub struct Token {
     pub t_type: TokenType,
     pub lexeme: String,
     pub literal: Option<LiteralType>,
     pub line: usize,
+}
+
+impl Token {
+    pub fn new(t_type: TokenType, lexeme: &str, literal: Option<LiteralType>, line: usize) -> Self {
+        let lexeme = lexeme.to_string();
+        Self {
+            t_type,
+            lexeme,
+            literal,
+            line,
+        }
+    }
 }
 
 impl Display for Token {

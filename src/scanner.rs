@@ -370,7 +370,7 @@ mod tests {
 
         let mut scanner = Scanner::new(value);
 
-        let expected_value = LiteralType::Number(123.456);
+        let expected_value = LiteralType::Number(123.0);
 
         let tokens = scanner.scan_tokens().expect("There shouldn't be an error");
 
