@@ -7,6 +7,8 @@ pub fn pretty_print(expr: &Expr) -> String {
         Expr::Literal { value } => match value {
             Some(LiteralType::String(v)) => v.to_string(),
             Some(LiteralType::Number(v)) => v.to_string(),
+            Some(LiteralType::Bool(v)) => v.to_string(),
+            Some(LiteralType::Nil) => "Nil".to_string(),
             None => "None".to_string(),
         },
         Expr::Unary { op, right } => parenthesize(&op.lexeme, &[right]),

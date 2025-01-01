@@ -52,19 +52,21 @@ pub enum TokenType {
 pub enum LiteralType {
     String(String),
     Number(f64),
+    Bool(bool),
+    Nil,
 }
 
 impl LiteralType {
     pub fn string_literal(val: &str) -> LiteralType {
-        return LiteralType::String(val.to_string());
+        LiteralType::String(val.to_string())
     }
 
     pub fn number_literal(val: f64) -> LiteralType {
-        return LiteralType::Number(val);
+        LiteralType::Number(val)
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub t_type: TokenType,
     pub lexeme: String,

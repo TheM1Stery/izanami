@@ -1,13 +1,17 @@
 use std::{
     error::Error,
+    fmt::Display,
     fs,
     io::{self, Write},
 };
 
+use parser::{ParseError, Parser};
+use printer::pretty_print;
 use scanner::Scanner;
-use token::Token;
+use token::{Token, TokenType};
 
 mod ast;
+mod parser;
 mod printer;
 mod scanner;
 mod token;
@@ -16,26 +20,26 @@ mod utils;
 pub fn run_file(path: &str) -> Result<(), Box<dyn Error>> {
     let file = fs::read_to_string(path)?;
 
-    run(&file);
+    run(&file)?;
     Ok(())
 }
 
-pub fn run(src: &str) {
+pub fn run(src: &str) -> Result<(), Box<dyn Error>> {
     let mut scanner = Scanner::new(src.to_string());
-    let tokens = scanner.scan_tokens();
+    let tokens = scanner.scan_tokens()?;
 
-    match tokens {
-        Err(ref errors) => {
-            for err in errors {
-                report(err.line, "", &err.msg);
-            }
-        }
-        Ok(tokens) => {
-            for token in tokens {
-                println!("{}", token);
-            }
+    let mut parser = Parser::new(tokens);
+
+    let expression = parser.parse();
+
+    match expression {
+        Ok(expr) => println!("{}", pretty_print(&expr)),
+        Err(e) => {
+            error(e.token, &e.msg);
         }
     }
+
+    Ok(())
 }
 
 pub fn run_prompt() -> Result<(), Box<dyn Error>> {
@@ -46,7 +50,7 @@ pub fn run_prompt() -> Result<(), Box<dyn Error>> {
         print!("> ");
         io::stdout().flush()?;
         stdin.read_line(input)?;
-        run(input);
+        let _ = run(input);
     }
 }
 
@@ -58,4 +62,11 @@ pub struct RloxError {
 
 pub fn report(line: usize, location: &str, message: &str) {
     eprintln!("[line {line}] Error {location}: {message}");
+}
+
+fn error(token: Token, message: &str) {
+    match token.t_type {
+        TokenType::EOF => report(token.line, " at end", message),
+        _ => report(token.line, &format!(" at '{}'", token.lexeme), message),
+    }
 }

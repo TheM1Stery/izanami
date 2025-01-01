@@ -1,4 +1,4 @@
-use std::{iter::Peekable, mem, str::Chars};
+use std::{fmt::Display, iter::Peekable, mem, str::Chars};
 
 use crate::{
     token::{LiteralType, Token, TokenType},
@@ -14,6 +14,19 @@ pub struct Scanner {
     current: usize,
     line: usize,
 }
+
+#[derive(Debug)]
+pub struct ScannerError {
+    errors: Vec<RloxError>,
+}
+
+impl Display for ScannerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Errors: {:?}", self.errors)
+    }
+}
+
+impl std::error::Error for ScannerError {}
 
 impl Scanner {
     pub fn new(source: String) -> Self {
@@ -35,7 +48,7 @@ impl Scanner {
 
     // this is so awful for me to write. This function needs to be not mutable in theory and it
     // could be accomplished. TODO!
-    pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, Vec<RloxError>> {
+    pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, ScannerError> {
         let mut errors = Vec::new();
         while self.peek().is_some() {
             self.start = self.current;
@@ -53,7 +66,7 @@ impl Scanner {
         });
 
         if !errors.is_empty() {
-            return Err(errors);
+            return Err(ScannerError { errors });
         }
 
         Ok(&self.tokens)
@@ -331,6 +344,7 @@ mod tests {
         let tokens = scanner.scan_tokens().expect_err("Should be an error");
 
         let actual_error = tokens
+            .errors
             .iter()
             .find(|e| e.msg == "Unterminated string")
             .expect("Error not found. There should be an error");
