@@ -28,6 +28,7 @@ impl Parser<'_> {
     }
 
     // Challenge #1. We're writing comma before equality, because it has the lowest precedence
+    // comma -> equality ((,) equality)* ;   // expression grammar
     fn comma(&mut self) -> Result<Expr, ParseError> {
         use TokenType::*;
         self.left_association_binary(&[Comma], Parser::equality)
