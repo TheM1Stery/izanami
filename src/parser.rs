@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use crate::{
     ast::Expr,
     token::{LiteralType, Token, TokenType},
@@ -26,7 +24,13 @@ impl Parser<'_> {
     }
 
     fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.equality()
+        self.comma()
+    }
+
+    // Challenge #1. We're writing comma before equality, because it has the lowest precedence
+    fn comma(&mut self) -> Result<Expr, ParseError> {
+        use TokenType::*;
+        self.left_association_binary(&[Comma], Parser::equality)
     }
 
     fn equality(&mut self) -> Result<Expr, ParseError> {
