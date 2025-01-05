@@ -22,6 +22,8 @@ pub enum TokenType {
     GreaterEqual,
     Less,
     LessEqual,
+    Question,
+    Colon,
 
     Identifier,
     String,
