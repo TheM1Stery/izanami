@@ -99,6 +99,8 @@ impl Scanner {
             '<' => self.add_token(TokenType::Less),
             '>' if self.peek_and_match('=') => self.add_token(TokenType::GreaterEqual),
             '>' => self.add_token(TokenType::Greater),
+            '?' => self.add_token(TokenType::Question),
+            ':' => self.add_token(TokenType::Colon),
             // checking for comments and just advance the iterator if it's a comment
             '/' if self.peek_and_match('/') => {
                 while self.peek().is_some_and(|x| x != '\n') {
