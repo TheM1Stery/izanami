@@ -90,6 +90,11 @@ impl Parser<'_> {
         self.primary()
     }
 
+    /* error boundaries:
+      ("!=" | "==") equality
+    | (">" | ">=" | "<" | "<=") comparison
+    | ("+") term
+    | ("/" | "*") factor ; */
     fn primary(&mut self) -> Result<Expr, ParseError> {
         use LiteralType::*;
         use TokenType::*;
@@ -120,6 +125,38 @@ impl Parser<'_> {
             self.consume(RightParen, "Expect ')' after expression")?;
             return Ok(Expr::Grouping {
                 expression: Box::new(expr),
+            });
+        }
+
+        if self.match_token(&[Equal, BangEqual]) {
+            let _ = self.equality();
+            return Err(ParseError {
+                token: self.previous().clone(),
+                msg: "Missing left-hand operand.".to_string(),
+            });
+        }
+
+        if self.match_token(&[Greater, GreaterEqual, Less, LessEqual]) {
+            let _ = self.comparison();
+            return Err(ParseError {
+                token: self.previous().clone(),
+                msg: "Missing left-hand operand.".to_string(),
+            });
+        }
+
+        if self.match_token(&[Plus]) {
+            let _ = self.term();
+            return Err(ParseError {
+                token: self.previous().clone(),
+                msg: "Missing left-hand operand.".to_string(),
+            });
+        }
+
+        if self.match_token(&[Star, Slash]) {
+            let _ = self.factor();
+            return Err(ParseError {
+                token: self.previous().clone(),
+                msg: "Missing left-hand operand.".to_string(),
             });
         }
 
