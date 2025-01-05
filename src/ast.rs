@@ -18,7 +18,7 @@ pub enum Expr {
         expression: Box<Expr>,
     },
     Literal {
-        value: Option<LiteralType>,
+        value: LiteralType,
     },
     Unary {
         op: Token,

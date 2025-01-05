@@ -5,11 +5,10 @@ pub fn pretty_print(expr: &Expr) -> String {
         Expr::Binary { left, op, right } => parenthesize(&op.lexeme, &[left, right]),
         Expr::Grouping { expression } => parenthesize("group", &[expression]),
         Expr::Literal { value } => match value {
-            Some(LiteralType::String(v)) => v.to_string(),
-            Some(LiteralType::Number(v)) => v.to_string(),
-            Some(LiteralType::Bool(v)) => v.to_string(),
-            Some(LiteralType::Nil) => "Nil".to_string(),
-            None => "None".to_string(),
+            LiteralType::String(v) => v.to_string(),
+            LiteralType::Number(v) => v.to_string(),
+            LiteralType::Bool(v) => v.to_string(),
+            LiteralType::Nil => "Nil".to_string(),
         },
         Expr::Unary { op, right } => parenthesize(&op.lexeme, &[right]),
         Expr::Ternary {
@@ -50,7 +49,7 @@ mod test {
         use TokenType::*;
         let expression = Binary {
             left: Box::new(Literal {
-                value: Some(LiteralType::Number(10.2)),
+                value: LiteralType::Number(10.2),
             }),
             op: Token {
                 t_type: Plus,
@@ -59,7 +58,7 @@ mod test {
                 line: 0,
             },
             right: Box::new(Literal {
-                value: Some(LiteralType::Number(10.2)),
+                value: LiteralType::Number(10.2),
             }),
         };
 
@@ -77,13 +76,13 @@ mod test {
             left: Box::new(Unary {
                 op: Token::new(Minus, "-", None, 0),
                 right: Box::new(Expr::Literal {
-                    value: Some(LiteralType::number_literal(123.0)),
+                    value: LiteralType::number_literal(123.0),
                 }),
             }),
             op: Token::new(Star, "*", None, 0),
             right: Box::new(Grouping {
                 expression: Box::new(Literal {
-                    value: Some(LiteralType::number_literal(45.67)),
+                    value: LiteralType::number_literal(45.67),
                 }),
             }),
         };

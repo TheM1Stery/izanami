@@ -99,25 +99,30 @@ impl Parser<'_> {
         use LiteralType::*;
         use TokenType::*;
 
-        fn create_literal(l_type: Option<LiteralType>) -> Expr {
+        fn create_literal(l_type: LiteralType) -> Expr {
             Expr::Literal { value: l_type }
         }
 
         if self.match_token(&[False]) {
-            return Ok(create_literal(Some(Bool(false))));
+            return Ok(create_literal(Bool(false)));
         }
 
         if self.match_token(&[True]) {
-            return Ok(create_literal(Some(Bool(true))));
+            return Ok(create_literal(Bool(true)));
         }
 
         if self.match_token(&[TokenType::Number, TokenType::String]) {
-            return Ok(create_literal(self.previous().literal.clone()));
+            return Ok(create_literal(
+                self.previous()
+                    .literal
+                    .clone()
+                    .expect("The number and string token should have a literal"),
+            ));
         }
 
         // i included the enum name bcs of ambiguity of LiteralType and TokenType
         if self.match_token(&[TokenType::Nil]) {
-            return Ok(create_literal(Some(LiteralType::Nil)));
+            return Ok(create_literal(LiteralType::Nil));
         }
 
         if self.match_token(&[LeftParen]) {
