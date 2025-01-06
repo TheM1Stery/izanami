@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{
     ast::Expr,
     token::{LiteralType, Token, TokenType},
@@ -13,6 +15,14 @@ pub struct ParseError {
     pub token: Token,
     pub msg: String,
 }
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ParseError: {} {}", self.token, self.msg)
+    }
+}
+
+impl std::error::Error for ParseError {}
 
 impl Parser<'_> {
     pub fn new(tokens: &Vec<Token>) -> Parser<'_> {

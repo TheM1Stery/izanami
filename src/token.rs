@@ -68,6 +68,17 @@ impl LiteralType {
     }
 }
 
+impl Display for LiteralType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LiteralType::String(v) => write!(f, "{v}"),
+            LiteralType::Number(v) => write!(f, "{v:.2}"),
+            LiteralType::Bool(v) => write!(f, "{v}"),
+            LiteralType::Nil => write!(f, "nil"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Token {
     pub t_type: TokenType,

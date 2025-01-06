@@ -1,43 +1,55 @@
 use std::{
     error::Error,
-    fmt::Display,
     fs,
     io::{self, Write},
 };
 
-use parser::{ParseError, Parser};
-use printer::pretty_print;
+use interpreter::RuntimeError;
+use parser::Parser;
 use scanner::Scanner;
 use token::{Token, TokenType};
 
 mod ast;
+mod interpreter;
 mod parser;
 mod printer;
 mod scanner;
 mod token;
 mod utils;
 
-pub fn run_file(path: &str) -> Result<(), Box<dyn Error>> {
-    let file = fs::read_to_string(path)?;
+#[derive(Debug)]
+pub enum RunError {
+    FileReadError(io::Error),
+    OtherError(Box<dyn Error>), // to be added,
+    RuntimeError(RuntimeError),
+}
+
+impl<E: Error + 'static> From<E> for RunError {
+    fn from(value: E) -> Self {
+        Self::OtherError(Box::new(value))
+    }
+}
+
+pub fn run_file(path: &str) -> Result<(), RunError> {
+    let file = fs::read_to_string(path).map_err(RunError::FileReadError)?;
 
     run(&file)?;
     Ok(())
 }
 
-pub fn run(src: &str) -> Result<(), Box<dyn Error>> {
+pub fn run(src: &str) -> Result<(), RunError> {
     let mut scanner = Scanner::new(src.to_string());
     let tokens = scanner.scan_tokens()?;
 
     let mut parser = Parser::new(tokens);
 
-    let expression = parser.parse();
+    let expression = parser.parse().inspect_err(|e| error(&e.token, &e.msg))?;
 
-    match expression {
-        Ok(expr) => println!("{}", pretty_print(&expr)),
-        Err(e) => {
-            error(e.token, &e.msg);
-        }
-    }
+    let interpreted_value = interpreter::interpret(&expression)
+        .inspect_err(runtime_error)
+        .map_err(RunError::RuntimeError)?;
+
+    println!("{interpreted_value}");
 
     Ok(())
 }
@@ -64,9 +76,13 @@ pub fn report(line: usize, location: &str, message: &str) {
     eprintln!("[line {line}] Error {location}: {message}");
 }
 
-fn error(token: Token, message: &str) {
+fn error(token: &Token, message: &str) {
     match token.t_type {
         TokenType::EOF => report(token.line, " at end", message),
         _ => report(token.line, &format!(" at '{}'", token.lexeme), message),
     }
+}
+
+fn runtime_error(err: &RuntimeError) {
+    eprintln!("{}\n[line {}]", err.message, err.token.line);
 }
