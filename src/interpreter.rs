@@ -62,6 +62,8 @@ fn binary(
         (Minus, Number(left), Number(right)) => Ok(Number(left - right)),
         (Plus, Number(left), Number(right)) => Ok(Number(left + right)),
         (Plus, String(left), String(right)) => Ok(String(format!("{left}{right}"))),
+        (Plus, String(left), Number(right)) => Ok(String(format!("{left}{right}"))),
+        (Plus, Number(left), String(right)) => Ok(String(format!("{left}{right}"))),
         (Slash, Number(left), Number(right)) => Ok(Number(left / right)),
         (Star, Number(left), Number(right)) => Ok(Number(left * right)),
         (Comma, _,_) => Ok(right.clone()),
