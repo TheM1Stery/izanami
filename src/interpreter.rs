@@ -66,10 +66,10 @@ fn binary(
         (Plus, Number(left), String(right)) => Ok(String(format!("{left}{right}"))),
         (Slash, Number(left), Number(right)) => Ok(Number(left / right)),
         (Star, Number(left), Number(right)) => Ok(Number(left * right)),
+        /* comma operator discard the left operand, so we just return the evaluation of the right operand */
         (Comma, _,_) => Ok(right.clone()),
         (Greater | GreaterEqual | Less | LessEqual | Minus | Slash | Star, _, _) => Err(RuntimeError::new(op, "Operands must be numbers")),
         (Plus, _, _) => Err(RuntimeError::new(op, "Operands must be two numbers or two strings")),
-        /* comma operator discard the left operand, so we just return the evaluation of the right operand */
 
         _ => unreachable!("Shouldn't happen. Expr::Binary for interpret. Some case is a binary operation that wasn't matched")
     }
