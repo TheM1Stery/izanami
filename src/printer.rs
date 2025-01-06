@@ -13,14 +13,9 @@ pub fn pretty_print(expr: &Expr) -> String {
         Expr::Unary { op, right } => parenthesize(&op.lexeme, &[right]),
         Expr::Ternary {
             first,
-            first_op,
             second,
-            second_op,
             third,
-        } => parenthesize(
-            &format!("{}{}", first_op.lexeme, second_op.lexeme),
-            &[first, second, third],
-        ),
+        } => parenthesize("?:", &[first, second, third]),
     }
 }
 

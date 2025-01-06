@@ -50,15 +50,12 @@ impl Parser<'_> {
         let expr = self.equality()?;
 
         if self.match_token(&[Question]) {
-            let first_op = self.previous().clone();
             let second = self.expression()?;
-            let second_op = self.consume(Colon, "Expected : after ternary operator ?")?;
+            let _ = self.consume(Colon, "Expected : after ternary operator ?")?;
             let third = self.ternary()?;
             return Ok(Expr::Ternary {
                 first: Box::new(expr),
-                first_op,
                 second: Box::new(second),
-                second_op,
                 third: Box::new(third),
             });
         }

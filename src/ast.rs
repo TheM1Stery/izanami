@@ -4,9 +4,7 @@ use crate::token::{LiteralType, Token};
 pub enum Expr {
     Ternary {
         first: Box<Expr>,
-        first_op: Token,
         second: Box<Expr>,
-        second_op: Token,
         third: Box<Expr>,
     },
     Binary {
