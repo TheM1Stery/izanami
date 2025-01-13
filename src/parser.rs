@@ -111,11 +111,18 @@ impl Parser<'_> {
     }
 
     fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.assignment()
+        self.comma()
+    }
+
+    // Challenge #1. We're writing comma before equality, because it has the lowest precedence
+    // comma -> equality ("," equality)* ;   // expression grammar
+    fn comma(&mut self) -> Result<Expr, ParseError> {
+        use TokenType::*;
+        self.left_association_binary(&[Comma], Self::assignment)
     }
 
     fn assignment(&mut self) -> Result<Expr, ParseError> {
-        let expr = self.comma()?;
+        let expr = self.ternary()?;
 
         if self.match_token(&[TokenType::Equal]) {
             let value = self.assignment()?;
@@ -134,13 +141,6 @@ impl Parser<'_> {
         }
 
         Ok(expr)
-    }
-
-    // Challenge #1. We're writing comma before equality, because it has the lowest precedence
-    // comma -> equality ("," equality)* ;   // expression grammar
-    fn comma(&mut self) -> Result<Expr, ParseError> {
-        use TokenType::*;
-        self.left_association_binary(&[Comma], Self::ternary)
     }
 
     // ternary -> equality ("?" expression : ternary)? // expression grammar
