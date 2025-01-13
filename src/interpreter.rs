@@ -21,8 +21,10 @@ impl RuntimeError {
     }
 }
 
-pub fn interpret(statements: &Vec<Stmt>) -> Result<(), RuntimeError> {
-    let environment = Rc::new(RefCell::new(Environment::new()));
+pub fn interpret(
+    statements: &Vec<Stmt>,
+    environment: &Rc<RefCell<Environment>>,
+) -> Result<(), RuntimeError> {
     for statement in statements {
         execute(statement, &environment)?;
     }

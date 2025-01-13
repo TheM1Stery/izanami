@@ -1,9 +1,12 @@
 use std::{
+    cell::RefCell,
     error::Error,
     fs,
     io::{self, Write},
+    rc::Rc,
 };
 
+use environment::Environment;
 use interpreter::RuntimeError;
 use parser::{ParseError, Parser};
 use scanner::Scanner;
@@ -34,12 +37,13 @@ impl<E: Error + 'static> From<E> for RunError {
 
 pub fn run_file(path: &str) -> Result<(), RunError> {
     let file = fs::read_to_string(path).map_err(RunError::FileReadError)?;
+    let environment = Rc::new(RefCell::new(Environment::new()));
 
-    run(&file)?;
+    run(&file, &environment)?;
     Ok(())
 }
 
-pub fn run(src: &str) -> Result<(), RunError> {
+pub fn run(src: &str, environment: &Rc<RefCell<Environment>>) -> Result<(), RunError> {
     let mut scanner = Scanner::new(src.to_string());
     let tokens = scanner.scan_tokens()?;
 
@@ -63,7 +67,7 @@ pub fn run(src: &str) -> Result<(), RunError> {
 
     let statements = statements.into_iter().flatten().collect();
 
-    interpreter::interpret(&statements)
+    interpreter::interpret(&statements, environment)
         .inspect_err(runtime_error)
         .map_err(RunError::RuntimeError)?;
 
@@ -73,12 +77,13 @@ pub fn run(src: &str) -> Result<(), RunError> {
 pub fn run_prompt() -> Result<(), Box<dyn Error>> {
     let stdin = io::stdin();
     let input = &mut String::new();
+    let environment = Rc::new(RefCell::new(Environment::new()));
     loop {
         input.clear();
         print!("> ");
         io::stdout().flush()?;
         stdin.read_line(input)?;
-        let _ = run(input);
+        let _ = run(input, &environment);
     }
 }
 
