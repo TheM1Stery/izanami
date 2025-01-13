@@ -1,5 +1,8 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
-    ast::Expr,
+    ast::{Expr, Stmt},
+    environment::Environment,
     token::{LiteralType, Token, TokenType},
 };
 
@@ -18,27 +21,97 @@ impl RuntimeError {
     }
 }
 
-pub fn interpret(expr: &Expr) -> Result<LiteralType, RuntimeError> {
+pub fn interpret(statements: &Vec<Stmt>) -> Result<(), RuntimeError> {
+    let environment = Rc::new(RefCell::new(Environment::new()));
+    for statement in statements {
+        execute(statement, &environment)?;
+    }
+
+    Ok(())
+}
+
+fn execute(statement: &Stmt, environment: &Rc<RefCell<Environment>>) -> Result<(), RuntimeError> {
+    match statement {
+        Stmt::Expression { expression } => {
+            evaluate(expression, &mut environment.borrow_mut())?;
+        }
+        Stmt::Print { expression } => {
+            let expr = evaluate(expression, &mut environment.borrow_mut())?;
+            println!("{expr}");
+        }
+        Stmt::Var { name, initializer } => {
+            let value = if let Some(initializer) = initializer {
+                evaluate(initializer, &mut environment.borrow_mut())?
+            } else {
+                LiteralType::Nil
+            };
+            environment.borrow_mut().define(&name.lexeme, value);
+        }
+        Stmt::Block { statements } => {
+            execute_block(statements, environment)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn execute_block(
+    statements: &Vec<Stmt>,
+    environment: &Rc<RefCell<Environment>>,
+) -> Result<(), RuntimeError> {
+    let block_enviroment = Rc::new(RefCell::new(Environment::with_enclosing(environment)));
+    for stmt in statements {
+        execute(stmt, &block_enviroment)?;
+    }
+
+    Ok(())
+}
+
+fn evaluate(expr: &Expr, environment: &mut Environment) -> Result<LiteralType, RuntimeError> {
     match expr {
         Expr::Ternary {
             first,
             second,
             third,
             ..
-        } => ternary(first, second, third),
-        Expr::Binary { left, op, right } => binary(&interpret(left)?, &interpret(right)?, op),
-        Expr::Grouping { expression } => interpret(expression),
+        } => ternary(first, second, third, environment),
+        Expr::Binary { left, op, right } => binary(
+            &evaluate(left, environment)?,
+            &evaluate(right, environment)?,
+            op,
+        ),
+        Expr::Grouping { expression } => evaluate(expression, environment),
         Expr::Literal { value } => Ok(value.clone()),
-        Expr::Unary { op, right } => Ok(unary(&interpret(right)?, op)),
+        Expr::Unary { op, right } => Ok(unary(&evaluate(right, environment)?, op)),
+        Expr::Variable { name } => environment.get(name).ok_or_else(|| RuntimeError {
+            token: name.clone(),
+            message: format!("Undefined variable {}.", name.lexeme),
+        }),
+        Expr::Assign { name, value } => {
+            let value = evaluate(value, environment)?;
+            environment
+                .assign(name, value.clone())
+                .map_err(|_| RuntimeError {
+                    token: name.clone(),
+                    message: format!("Undefined variable {}.", name.lexeme),
+                })?;
+
+            Ok(value)
+        }
     }
 }
 
-fn ternary(first: &Expr, second: &Expr, third: &Expr) -> Result<LiteralType, RuntimeError> {
-    let first = interpret(first)?;
+fn ternary(
+    first: &Expr,
+    second: &Expr,
+    third: &Expr,
+    environment: &mut Environment,
+) -> Result<LiteralType, RuntimeError> {
+    let first = evaluate(first, environment)?;
     if is_truthy(&first) {
-        return interpret(second);
+        return evaluate(second, environment);
     }
-    interpret(third)
+    evaluate(third, environment)
 }
 
 fn binary(
@@ -71,7 +144,7 @@ fn binary(
         (Greater | GreaterEqual | Less | LessEqual | Minus | Slash | Star, _, _) => Err(RuntimeError::new(op, "Operands must be numbers")),
         (Plus, _, _) => Err(RuntimeError::new(op, "Operands must be two numbers or two strings")),
 
-        _ => unreachable!("Shouldn't happen. Expr::Binary for interpret. Some case is a binary operation that wasn't matched")
+        _ => unreachable!("Shouldn't happen. Expr::Binary for evaluate. Some case is a binary operation that wasn't matched")
     }
 }
 
@@ -79,7 +152,7 @@ fn unary(right: &LiteralType, op: &Token) -> LiteralType {
     match (op.t_type, &right) {
         (TokenType::Minus, LiteralType::Number(num)) => LiteralType::Number(-num),
         (TokenType::Bang, _) => LiteralType::Bool(!is_truthy(right)),
-        _ => unreachable!("Shouldn't happen. Expr::Unary for interpret"),
+        _ => unreachable!("Shouldn't happen. Expr::Unary for evaluate"),
     }
 }
 

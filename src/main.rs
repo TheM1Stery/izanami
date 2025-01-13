@@ -23,6 +23,10 @@ fn main() -> ExitCode {
         if let Err(RunError::RuntimeError(r)) = result {
             return ExitCode::from(70);
         }
+
+        if let Err(RunError::ParseError) = result {
+            return ExitCode::from(75);
+        }
     } else {
         let result = run_prompt();
 

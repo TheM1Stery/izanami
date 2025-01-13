@@ -22,4 +22,27 @@ pub enum Expr {
         op: Token,
         right: Box<Expr>,
     },
+    Variable {
+        name: Token,
+    },
+    Assign {
+        name: Token,
+        value: Box<Expr>,
+    },
+}
+
+pub enum Stmt {
+    Block {
+        statements: Vec<Stmt>,
+    },
+    Expression {
+        expression: Expr,
+    },
+    Print {
+        expression: Expr,
+    },
+    Var {
+        name: Token,
+        initializer: Option<Expr>,
+    },
 }

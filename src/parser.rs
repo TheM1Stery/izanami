@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crate::{
-    ast::Expr,
+    ast::{Expr, Stmt},
     token::{LiteralType, Token, TokenType},
 };
 
@@ -29,12 +29,111 @@ impl Parser<'_> {
         Parser { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> Result<Expr, ParseError> {
-        self.expression()
+    //pub fn parse(&mut self) -> Result<Expr, ParseError> {
+    //    self.expression()
+    //}
+
+    // maps to program rule in the grammar
+    pub fn parse(&mut self) -> Vec<Result<Stmt, ParseError>> {
+        let mut statements = Vec::new();
+
+        while !self.is_at_end() {
+            statements.push(self.declaration());
+        }
+
+        statements
+    }
+
+    fn declaration(&mut self) -> Result<Stmt, ParseError> {
+        let stmt = if self.match_token(&[TokenType::Var]) {
+            self.var_declaration()
+        } else {
+            self.statement()
+        };
+
+        stmt.inspect_err(|_| self.synchronize())
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt, ParseError> {
+        let name = self.consume(TokenType::Identifier, "Expect variable name")?;
+        let initializer = if self.match_token(&[TokenType::Equal]) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+
+        self.consume(
+            TokenType::Semicolon,
+            "Expect ';' after variable declaration.",
+        )?;
+
+        Ok(Stmt::Var { name, initializer })
+    }
+
+    fn statement(&mut self) -> Result<Stmt, ParseError> {
+        if self.match_token(&[TokenType::Print]) {
+            return self.print_statement();
+        }
+
+        if self.match_token(&[TokenType::LeftBrace]) {
+            return Ok(Stmt::Block {
+                statements: self.block()?,
+            });
+        }
+
+        self.expression_statement()
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt>, ParseError> {
+        let mut statements = Vec::new();
+
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            statements.push(self.declaration()?);
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after block.")?;
+
+        Ok(statements)
+    }
+
+    fn print_statement(&mut self) -> Result<Stmt, ParseError> {
+        let expression = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
+
+        Ok(Stmt::Print { expression })
+    }
+
+    fn expression_statement(&mut self) -> Result<Stmt, ParseError> {
+        let expression = self.expression()?;
+        self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
+
+        Ok(Stmt::Expression { expression })
     }
 
     fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.comma()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> Result<Expr, ParseError> {
+        let expr = self.comma()?;
+
+        if self.match_token(&[TokenType::Equal]) {
+            let value = self.assignment()?;
+            let equals = self.previous();
+
+            if let Expr::Variable { name } = expr {
+                return Ok(Expr::Assign {
+                    name,
+                    value: Box::new(value),
+                });
+            }
+            return Err(ParseError {
+                token: equals.clone(),
+                msg: "Invalid assignment target.".to_string(),
+            });
+        }
+
+        Ok(expr)
     }
 
     // Challenge #1. We're writing comma before equality, because it has the lowest precedence
@@ -140,6 +239,12 @@ impl Parser<'_> {
             });
         }
 
+        if self.match_token(&[Identifier]) {
+            return Ok(Expr::Variable {
+                name: self.previous().clone(),
+            });
+        }
+
         if self.match_token(&[Equal, BangEqual]) {
             let _ = self.equality();
             return Err(ParseError {
@@ -189,7 +294,6 @@ impl Parser<'_> {
         })
     }
 
-    // will not be used for the time being (per the book)
     // used for error recovery
     fn synchronize(&mut self) {
         use TokenType::*;
@@ -203,9 +307,8 @@ impl Parser<'_> {
             if let Class | Fun | Var | For | If | While | Print | Return = self.peek().t_type {
                 return;
             }
+            self.advance();
         }
-
-        self.advance();
     }
 
     fn left_association_binary(

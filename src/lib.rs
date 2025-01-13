@@ -5,11 +5,12 @@ use std::{
 };
 
 use interpreter::RuntimeError;
-use parser::Parser;
+use parser::{ParseError, Parser};
 use scanner::Scanner;
 use token::{Token, TokenType};
 
 mod ast;
+mod environment;
 mod interpreter;
 mod parser;
 mod printer;
@@ -22,6 +23,7 @@ pub enum RunError {
     FileReadError(io::Error),
     OtherError(Box<dyn Error>), // to be added,
     RuntimeError(RuntimeError),
+    ParseError,
 }
 
 impl<E: Error + 'static> From<E> for RunError {
@@ -43,13 +45,27 @@ pub fn run(src: &str) -> Result<(), RunError> {
 
     let mut parser = Parser::new(tokens);
 
-    let expression = parser.parse().inspect_err(|e| error(&e.token, &e.msg))?;
+    let statements = parser.parse();
 
-    let interpreted_value = interpreter::interpret(&expression)
+    // i don't want to collect the errors and allocate a vec
+    let mut p_error = false;
+
+    for err in statements.iter().filter_map(|x| x.as_ref().err()) {
+        if !p_error {
+            p_error = true;
+        }
+        error(err);
+    }
+
+    if p_error {
+        return Err(RunError::ParseError);
+    }
+
+    let statements = statements.into_iter().flatten().collect();
+
+    interpreter::interpret(&statements)
         .inspect_err(runtime_error)
         .map_err(RunError::RuntimeError)?;
-
-    println!("{interpreted_value}");
 
     Ok(())
 }
@@ -76,10 +92,10 @@ pub fn report(line: usize, location: &str, message: &str) {
     eprintln!("[line {line}] Error {location}: {message}");
 }
 
-fn error(token: &Token, message: &str) {
+fn error(ParseError { token, msg }: &ParseError) {
     match token.t_type {
-        TokenType::EOF => report(token.line, " at end", message),
-        _ => report(token.line, &format!(" at '{}'", token.lexeme), message),
+        TokenType::EOF => report(token.line, " at end", msg),
+        _ => report(token.line, &format!("at '{}'", token.lexeme), msg),
     }
 }
 
