@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use crate::token::{LiteralType, Token};
 
 pub struct Environment {
-    values: HashMap<String, LiteralType>,
+    values: HashMap<String, Option<LiteralType>>,
     enclosing: Option<Rc<RefCell<Environment>>>,
 }
 
@@ -26,7 +26,7 @@ impl Environment {
         }
     }
 
-    pub fn define(&mut self, name: &str, val: LiteralType) {
+    pub fn define(&mut self, name: &str, val: Option<LiteralType>) {
         // do not like this at all. String is allocated each time a variable is defined. Might be
         // bad or might be good. I don't know :D
         self.values.insert(name.to_string(), val);
@@ -37,7 +37,7 @@ impl Environment {
         let assigned = self
             .values
             .get_mut(&name.lexeme)
-            .map(|l| *l = val)
+            .map(|l| *l = Some(val))
             .ok_or(EnvironmentError::AssignError);
 
         if assigned.is_err() {
@@ -49,7 +49,7 @@ impl Environment {
         assigned
     }
 
-    pub fn get(&self, name: &Token) -> Option<LiteralType> {
+    pub fn get(&self, name: &Token) -> Option<Option<LiteralType>> {
         //self.values.get(&name.lexeme).cloned()
 
         let value = self.values.get(&name.lexeme);

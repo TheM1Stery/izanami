@@ -26,7 +26,7 @@ pub fn interpret(
     environment: &Rc<RefCell<Environment>>,
 ) -> Result<(), RuntimeError> {
     for statement in statements {
-        execute(statement, &environment)?;
+        execute(statement, environment)?;
     }
 
     Ok(())
@@ -43,9 +43,9 @@ fn execute(statement: &Stmt, environment: &Rc<RefCell<Environment>>) -> Result<(
         }
         Stmt::Var { name, initializer } => {
             let value = if let Some(initializer) = initializer {
-                evaluate(initializer, &mut environment.borrow_mut())?
+                Some(evaluate(initializer, &mut environment.borrow_mut())?)
             } else {
-                LiteralType::Nil
+                None
             };
             environment.borrow_mut().define(&name.lexeme, value);
         }
@@ -85,10 +85,22 @@ fn evaluate(expr: &Expr, environment: &mut Environment) -> Result<LiteralType, R
         Expr::Grouping { expression } => evaluate(expression, environment),
         Expr::Literal { value } => Ok(value.clone()),
         Expr::Unary { op, right } => Ok(unary(&evaluate(right, environment)?, op)),
-        Expr::Variable { name } => environment.get(name).ok_or_else(|| RuntimeError {
-            token: name.clone(),
-            message: format!("Undefined variable {}.", name.lexeme),
-        }),
+        //Expr::Variable { name } => environment.get(name).ok_or_else(|| RuntimeError {
+        //    token: name.clone(),
+        //    message: format!("Undefined variable {}.", name.lexeme),
+        //}),
+        Expr::Variable { name } => environment
+            .get(name)
+            .ok_or_else(|| RuntimeError {
+                token: name.clone(),
+                message: format!("Undefined variable {}.", name.lexeme),
+            })
+            .and_then(|x| {
+                x.ok_or_else(|| RuntimeError {
+                    token: name.clone(),
+                    message: format!("Uninitialized variable {}.", name.lexeme),
+                })
+            }),
         Expr::Assign { name, value } => {
             let value = evaluate(value, environment)?;
             environment
