@@ -85,10 +85,6 @@ fn evaluate(expr: &Expr, environment: &mut Environment) -> Result<LiteralType, R
         Expr::Grouping { expression } => evaluate(expression, environment),
         Expr::Literal { value } => Ok(value.clone()),
         Expr::Unary { op, right } => Ok(unary(&evaluate(right, environment)?, op)),
-        //Expr::Variable { name } => environment.get(name).ok_or_else(|| RuntimeError {
-        //    token: name.clone(),
-        //    message: format!("Undefined variable {}.", name.lexeme),
-        //}),
         Expr::Variable { name } => environment
             .get(name)
             .ok_or_else(|| RuntimeError {
