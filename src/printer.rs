@@ -18,6 +18,7 @@ pub fn pretty_print(expr: &Expr) -> String {
         } => parenthesize("?:", &[first, second, third]),
         Expr::Variable { name } => name.lexeme.clone(),
         Expr::Assign { name, value } => parenthesize(&name.lexeme, &[value]),
+        Expr::Logical { left, op, right } => parenthesize(&op.lexeme, &[left, right]),
     }
 }
 

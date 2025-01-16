@@ -29,6 +29,11 @@ pub enum Expr {
         name: Token,
         value: Box<Expr>,
     },
+    Logical {
+        left: Box<Expr>,
+        op: Token,
+        right: Box<Expr>,
+    },
 }
 
 pub enum Stmt {
@@ -38,11 +43,20 @@ pub enum Stmt {
     Expression {
         expression: Expr,
     },
+    If {
+        condition: Expr,
+        then_branch: Box<Stmt>,
+        else_branch: Option<Box<Stmt>>,
+    },
     Print {
         expression: Expr,
     },
     Var {
         name: Token,
         initializer: Option<Expr>,
+    },
+    While {
+        condition: Expr,
+        body: Box<Stmt>,
     },
 }

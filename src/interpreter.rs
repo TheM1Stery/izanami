@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     ast::{Expr, Stmt},
-    environment::Environment,
+    environment::{self, Environment},
     token::{LiteralType, Token, TokenType},
 };
 
@@ -51,6 +51,22 @@ fn execute(statement: &Stmt, environment: &Rc<RefCell<Environment>>) -> Result<(
         }
         Stmt::Block { statements } => {
             execute_block(statements, environment)?;
+        }
+        Stmt::If {
+            condition,
+            then_branch,
+            else_branch,
+        } => {
+            if is_truthy(&evaluate(condition, &mut environment.borrow_mut())?) {
+                execute(then_branch, environment)?;
+            } else if let Some(else_branch) = else_branch {
+                execute(else_branch, environment)?;
+            }
+        }
+        Stmt::While { condition, body } => {
+            while is_truthy(&evaluate(condition, &mut environment.borrow_mut())?) {
+                execute(body, environment)?;
+            }
         }
     }
 
@@ -107,6 +123,19 @@ fn evaluate(expr: &Expr, environment: &mut Environment) -> Result<LiteralType, R
                 })?;
 
             Ok(value)
+        }
+        Expr::Logical { left, op, right } => {
+            let left = evaluate(left, environment)?;
+
+            if op.t_type == TokenType::OR {
+                if is_truthy(&left) {
+                    return Ok(left);
+                }
+            } else if !is_truthy(&left) {
+                return Ok(left);
+            }
+
+            evaluate(right, environment)
         }
     }
 }
