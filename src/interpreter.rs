@@ -1,8 +1,9 @@
+use core::panic;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     ast::{Expr, Stmt},
-    environment::{self, Environment},
+    environment::Environment,
     token::{LiteralType, Token, TokenType},
 };
 
@@ -21,10 +22,30 @@ impl RuntimeError {
     }
 }
 
+pub enum InterpreterError {
+    RuntimeError(RuntimeError),
+    BreakSignal,
+}
+
+impl From<RuntimeError> for InterpreterError {
+    fn from(value: RuntimeError) -> Self {
+        Self::RuntimeError(value)
+    }
+}
+
+impl From<InterpreterError> for RuntimeError {
+    fn from(value: InterpreterError) -> Self {
+        match value {
+            InterpreterError::RuntimeError(runtime_error) => runtime_error,
+            InterpreterError::BreakSignal => panic!("Not a runtime error"),
+        }
+    }
+}
+
 pub fn interpret(
     statements: &Vec<Stmt>,
     environment: &Rc<RefCell<Environment>>,
-) -> Result<(), RuntimeError> {
+) -> Result<(), InterpreterError> {
     for statement in statements {
         execute(statement, environment)?;
     }
@@ -32,7 +53,10 @@ pub fn interpret(
     Ok(())
 }
 
-fn execute(statement: &Stmt, environment: &Rc<RefCell<Environment>>) -> Result<(), RuntimeError> {
+fn execute(
+    statement: &Stmt,
+    environment: &Rc<RefCell<Environment>>,
+) -> Result<(), InterpreterError> {
     match statement {
         Stmt::Expression { expression } => {
             evaluate(expression, &mut environment.borrow_mut())?;
@@ -65,9 +89,13 @@ fn execute(statement: &Stmt, environment: &Rc<RefCell<Environment>>) -> Result<(
         }
         Stmt::While { condition, body } => {
             while is_truthy(&evaluate(condition, &mut environment.borrow_mut())?) {
-                execute(body, environment)?;
+                let result = execute(body, environment);
+                if result.is_err() {
+                    break;
+                }
             }
         }
+        Stmt::Break => Err(InterpreterError::BreakSignal)?,
     }
 
     Ok(())
@@ -76,7 +104,7 @@ fn execute(statement: &Stmt, environment: &Rc<RefCell<Environment>>) -> Result<(
 fn execute_block(
     statements: &Vec<Stmt>,
     environment: &Rc<RefCell<Environment>>,
-) -> Result<(), RuntimeError> {
+) -> Result<(), InterpreterError> {
     let block_enviroment = Rc::new(RefCell::new(Environment::with_enclosing(environment)));
     for stmt in statements {
         execute(stmt, &block_enviroment)?;
@@ -85,7 +113,7 @@ fn execute_block(
     Ok(())
 }
 
-fn evaluate(expr: &Expr, environment: &mut Environment) -> Result<LiteralType, RuntimeError> {
+fn evaluate(expr: &Expr, environment: &mut Environment) -> Result<LiteralType, InterpreterError> {
     match expr {
         Expr::Ternary {
             first,
@@ -112,7 +140,8 @@ fn evaluate(expr: &Expr, environment: &mut Environment) -> Result<LiteralType, R
                     token: name.clone(),
                     message: format!("Uninitialized variable {}.", name.lexeme),
                 })
-            }),
+            })
+            .map_err(InterpreterError::RuntimeError),
         Expr::Assign { name, value } => {
             let value = evaluate(value, environment)?;
             environment
@@ -145,7 +174,7 @@ fn ternary(
     second: &Expr,
     third: &Expr,
     environment: &mut Environment,
-) -> Result<LiteralType, RuntimeError> {
+) -> Result<LiteralType, InterpreterError> {
     let first = evaluate(first, environment)?;
     if is_truthy(&first) {
         return evaluate(second, environment);
@@ -157,7 +186,7 @@ fn binary(
     left: &LiteralType,
     right: &LiteralType,
     op: &Token,
-) -> Result<LiteralType, RuntimeError> {
+) -> Result<LiteralType, InterpreterError> {
     use LiteralType::{Bool, Number, String};
     use TokenType::{
         BangEqual, Comma, EqualEqual, Greater, GreaterEqual, Less, LessEqual, Minus, Plus, Slash,
@@ -180,8 +209,8 @@ fn binary(
         (Star, Number(left), Number(right)) => Ok(Number(left * right)),
         /* comma operator discard the left operand, so we just return the evaluation of the right operand */
         (Comma, _,_) => Ok(right.clone()),
-        (Greater | GreaterEqual | Less | LessEqual | Minus | Slash | Star, _, _) => Err(RuntimeError::new(op, "Operands must be numbers")),
-        (Plus, _, _) => Err(RuntimeError::new(op, "Operands must be two numbers or two strings")),
+        (Greater | GreaterEqual | Less | LessEqual | Minus | Slash | Star, _, _) => Err(RuntimeError::new(op, "Operands must be numbers"))?,
+        (Plus, _, _) => Err(RuntimeError::new(op, "Operands must be two numbers or two strings"))?,
 
         _ => unreachable!("Shouldn't happen. Expr::Binary for evaluate. Some case is a binary operation that wasn't matched")
     }

@@ -266,6 +266,7 @@ fn get_identified_keyword(identifier: &str) -> Option<TokenType> {
         "true" => Some(TokenType::True),
         "var" => Some(TokenType::Var),
         "while" => Some(TokenType::While),
+        "break" => Some(TokenType::Break),
         _ => None,
     }
 }

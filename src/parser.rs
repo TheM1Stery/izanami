@@ -3,11 +3,13 @@ use std::fmt::Display;
 use crate::{
     ast::{Expr, Stmt},
     token::{LiteralType, Token, TokenType},
+    utils::{defer, expr, ScopeCall},
 };
 
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     current: usize,
+    loop_depth: u32,
 }
 
 #[derive(Debug)]
@@ -26,7 +28,15 @@ impl std::error::Error for ParseError {}
 
 impl Parser<'_> {
     pub fn new(tokens: &Vec<Token>) -> Parser<'_> {
-        Parser { tokens, current: 0 }
+        Parser {
+            tokens,
+            current: 0,
+            loop_depth: 0,
+        }
+    }
+
+    pub fn loop_depth(&mut self) -> &mut u32 {
+        &mut self.loop_depth
     }
 
     //pub fn parse(&mut self) -> Result<Expr, ParseError> {
@@ -84,6 +94,10 @@ impl Parser<'_> {
             return self.while_statement();
         }
 
+        if self.match_token(&[TokenType::Break]) {
+            return self.break_statement();
+        }
+
         if self.match_token(&[TokenType::LeftBrace]) {
             return Ok(Stmt::Block {
                 statements: self.block()?,
@@ -103,6 +117,18 @@ impl Parser<'_> {
         self.consume(TokenType::RightBrace, "Expect '}' after block.")?;
 
         Ok(statements)
+    }
+
+    fn break_statement(&mut self) -> Result<Stmt, ParseError> {
+        if *self.loop_depth() == 0 {
+            return Err(ParseError {
+                token: self.previous().clone(),
+                msg: "Must be inside a loop to use 'break'".to_string(),
+            });
+        }
+        self.consume(TokenType::Semicolon, "Expect ';' after 'break'")?;
+
+        Ok(Stmt::Break)
     }
 
     fn if_statement(&mut self) -> Result<Stmt, ParseError> {
@@ -125,15 +151,20 @@ impl Parser<'_> {
     }
 
     fn while_statement(&mut self) -> Result<Stmt, ParseError> {
+        self.loop_depth += 1;
         self.consume(TokenType::LeftParen, "Expect '(' after 'while'.")?;
         let condition = self.expression()?;
         self.consume(TokenType::RightParen, "Expect ')' after while condition.")?;
         let body = Box::new(self.statement()?);
+        defer! {
+            *self.loop_depth() += 1;
+        }
 
         Ok(Stmt::While { condition, body })
     }
 
     fn for_statement(&mut self) -> Result<Stmt, ParseError> {
+        self.loop_depth += 1;
         self.consume(TokenType::LeftParen, "Expect '(' after 'for'.")?;
         let initializer = if self.match_token(&[TokenType::Semicolon]) {
             None
@@ -181,6 +212,10 @@ impl Parser<'_> {
             },
             None => body,
         };
+
+        defer! {
+            *self.loop_depth() -= 1;
+        }
 
         Ok(body)
     }

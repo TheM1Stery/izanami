@@ -40,6 +40,7 @@ pub enum Stmt {
     Block {
         statements: Vec<Stmt>,
     },
+    Break,
     Expression {
         expression: Expr,
     },

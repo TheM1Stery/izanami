@@ -30,6 +30,7 @@ pub enum TokenType {
     Number,
 
     And,
+    Break,
     Class,
     Else,
     False,

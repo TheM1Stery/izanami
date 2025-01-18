@@ -10,7 +10,7 @@ use environment::Environment;
 use interpreter::RuntimeError;
 use parser::{ParseError, Parser};
 use scanner::Scanner;
-use token::{Token, TokenType};
+use token::TokenType;
 
 mod ast;
 mod environment;
@@ -68,6 +68,7 @@ pub fn run(src: &str, environment: &Rc<RefCell<Environment>>) -> Result<(), RunE
     let statements = statements.into_iter().flatten().collect();
 
     interpreter::interpret(&statements, environment)
+        .map_err(|x| x.into())
         .inspect_err(runtime_error)
         .map_err(RunError::RuntimeError)?;
 

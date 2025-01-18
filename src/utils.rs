@@ -50,3 +50,30 @@ impl StringUtils for String {
         self.substring(start, len)
     }
 }
+
+pub struct ScopeCall<F: FnMut()> {
+    pub c: Option<F>,
+}
+
+impl<F: FnMut()> Drop for ScopeCall<F> {
+    fn drop(&mut self) {
+        self.c.take().unwrap()()
+    }
+}
+
+macro_rules! expr {
+    ($e: expr) => {
+        $e
+    };
+}
+
+macro_rules! defer {
+    ($($data: tt)*) => (
+        let _scope_call = ScopeCall {
+            c: Some(|| -> () { expr!({ $($data)* }) })
+        };
+    )
+}
+
+pub(crate) use defer;
+pub(crate) use expr;
