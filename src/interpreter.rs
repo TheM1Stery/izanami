@@ -16,7 +16,7 @@ type InterpreterResult = Result<LiteralType, InterpreterSignal>;
 
 #[derive(Debug)]
 pub struct RuntimeError {
-    pub token: Token,
+    pub token: Option<Token>,
     pub message: String,
 }
 
@@ -26,9 +26,16 @@ pub struct InterpreterEnvironment {
 }
 
 impl RuntimeError {
-    pub fn new(token: &Token, message: &str) -> RuntimeError {
+    pub fn new(token: &Token, message: String) -> Self {
         RuntimeError {
-            token: token.clone(),
+            token: Some(token.clone()),
+            message: message.to_string(),
+        }
+    }
+
+    pub fn no_token(message: String) -> Self {
+        RuntimeError {
+            token: None,
             message: message.to_string(),
         }
     }
@@ -84,6 +91,12 @@ pub fn interpret(
         "clock",
         Some(LiteralType::Callable(Callable::NativeFunction(
             clock_function,
+        ))),
+    );
+    environment.globals.borrow_mut().define(
+        "read_input",
+        Some(LiteralType::Callable(Callable::NativeFunction(
+            read_input_function(),
         ))),
     );
     for statement in statements {
@@ -203,14 +216,10 @@ fn evaluate(expr: &Expr, environment: &InterpreterEnvironment) -> InterpreterRes
         Expr::Variable { name } => curr_environment
             .borrow()
             .get(name)
-            .ok_or_else(|| RuntimeError {
-                token: name.clone(),
-                message: format!("Undefined variable {}.", name.lexeme),
-            })
+            .ok_or_else(|| RuntimeError::new(name, format!("Undefined variable {}.", name.lexeme)))
             .and_then(|x| {
-                x.ok_or_else(|| RuntimeError {
-                    token: name.clone(),
-                    message: format!("Uninitialized variable {}.", name.lexeme),
+                x.ok_or_else(|| {
+                    RuntimeError::new(name, format!("Uninitialized variable {}.", name.lexeme))
                 })
             })
             .map_err(InterpreterSignal::RuntimeError),
@@ -219,11 +228,9 @@ fn evaluate(expr: &Expr, environment: &InterpreterEnvironment) -> InterpreterRes
             curr_environment
                 .borrow_mut()
                 .assign(name, value.clone())
-                .map_err(|_| RuntimeError {
-                    token: name.clone(),
-                    message: format!("Undefined variable {}.", name.lexeme),
+                .map_err(|_| {
+                    RuntimeError::new(name, format!("Undefined variable {}.", name.lexeme))
                 })?;
-
             Ok(value)
         }
         Expr::Logical { left, op, right } => {
@@ -254,21 +261,21 @@ fn evaluate(expr: &Expr, environment: &InterpreterEnvironment) -> InterpreterRes
             match callee_result {
                 LiteralType::Callable(function) => {
                     if arguments.len() as u8 != function.arity() {
-                        Err(RuntimeError {
-                            token: paren.clone(),
-                            message: format!(
+                        Err(RuntimeError::new(
+                            paren,
+                            format!(
                                 "Expected {} arguments but got {}.",
                                 function.arity(),
                                 args.len()
                             ),
-                        })?
+                        ))?
                     }
                     Ok(function.call(&arguments, environment)?)
                 }
-                _ => Err(RuntimeError {
-                    token: paren.clone(),
-                    message: "Can only call functions and classes".to_string(),
-                })?,
+                _ => Err(RuntimeError::new(
+                    paren,
+                    "Can only call functions and classes".to_string(),
+                ))?,
             }
         }
     }
@@ -310,8 +317,8 @@ fn binary(left: &LiteralType, right: &LiteralType, op: &Token) -> InterpreterRes
         (Star, Number(left), Number(right)) => Ok(Number(left * right)),
         /* comma operator discard the left operand, so we just return the evaluation of the right operand */
         (Comma, _,_) => Ok(right.clone()),
-        (Greater | GreaterEqual | Less | LessEqual | Minus | Slash | Star, _, _) => Err(RuntimeError::new(op, "Operands must be numbers"))?,
-        (Plus, _, _) => Err(RuntimeError::new(op, "Operands must be two numbers or two strings"))?,
+        (Greater | GreaterEqual | Less | LessEqual | Minus | Slash | Star, _, _) => Err(RuntimeError::new(op, "Operands must be numbers".to_string()))?,
+        (Plus, _, _) => Err(RuntimeError::new(op, "Operands must be two numbers or two strings".to_string()))?,
 
         _ => unreachable!("Shouldn't happen. Expr::Binary for evaluate. Some case is a binary operation that wasn't matched")
     }
@@ -343,4 +350,18 @@ pub fn is_equal(left: &LiteralType, right: &LiteralType) -> bool {
         (LiteralType::Bool(t1), LiteralType::Bool(t2)) => t1 == t2,
         _ => false,
     }
+}
+
+fn read_input_function() -> NativeFunction {
+    use std::io;
+    let read_input = |_: &[LiteralType]| {
+        let mut buf = String::new();
+        io::stdin()
+            .read_line(&mut buf)
+            .map_err(|_| RuntimeError::no_token("Error reading from stdin".to_string()))?;
+
+        Ok(LiteralType::String(buf))
+    };
+
+    NativeFunction::new("read_input".to_string(), 0, read_input)
 }

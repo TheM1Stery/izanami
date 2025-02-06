@@ -107,5 +107,7 @@ fn error(ParseError { token, msg }: &ParseError) {
 }
 
 fn runtime_error(err: &RuntimeError) {
-    eprintln!("{}\n[line {}]", err.message, err.token.line);
+    if let Some(token) = &err.token {
+        eprintln!("{}\n[line {}]", err.message, token.line);
+    }
 }
