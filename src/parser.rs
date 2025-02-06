@@ -55,13 +55,51 @@ impl Parser<'_> {
     }
 
     fn declaration(&mut self) -> Result<Stmt, ParseError> {
-        let stmt = if self.match_token(&[TokenType::Var]) {
+        let stmt = if self.match_token(&[TokenType::Fun]) {
+            self.function("function")
+        } else if self.match_token(&[TokenType::Var]) {
             self.var_declaration()
         } else {
             self.statement()
         };
 
         stmt.inspect_err(|_| self.synchronize())
+    }
+
+    fn function(&mut self, kind: &str) -> Result<Stmt, ParseError> {
+        let name = self.consume(TokenType::Identifier, &format!("Expect {} name.", kind))?;
+        self.consume(
+            TokenType::LeftParen,
+            &format!("Expect '(' after {kind} name."),
+        )?;
+        let mut params = Vec::new();
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if params.len() >= 255 {
+                    return Err(ParseError {
+                        token: self.peek().clone(),
+                        msg: "Can't have more than 255 parameters".to_string(),
+                    });
+                }
+
+                params.push(self.consume(TokenType::Identifier, "Expect parameter name.")?);
+
+                if !self.match_token(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        self.consume(TokenType::RightParen, "Expect ')' after parameters")?;
+
+        self.consume(
+            TokenType::LeftBrace,
+            &format!("Expect '{{' before {} body.", kind),
+        )?;
+
+        let body = self.block()?;
+
+        Ok(Stmt::Function { name, params, body })
     }
 
     fn var_declaration(&mut self) -> Result<Stmt, ParseError> {
@@ -89,6 +127,9 @@ impl Parser<'_> {
         }
         if self.match_token(&[TokenType::Print]) {
             return self.print_statement();
+        }
+        if self.match_token(&[TokenType::Return]) {
+            return self.return_statement();
         }
         if self.match_token(&[TokenType::While]) {
             return self.while_statement();
@@ -227,6 +268,19 @@ impl Parser<'_> {
         Ok(Stmt::Print { expression })
     }
 
+    fn return_statement(&mut self) -> Result<Stmt, ParseError> {
+        let keyword = self.previous().clone();
+        let value = if !self.check(TokenType::Semicolon) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+
+        self.consume(TokenType::Semicolon, "Expect ';' after return value.");
+
+        Ok(Stmt::Return { keyword, value })
+    }
+
     fn expression_statement(&mut self) -> Result<Stmt, ParseError> {
         let expression = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after expression.")?;
@@ -348,7 +402,46 @@ impl Parser<'_> {
             });
         }
 
-        self.primary()
+        self.call()
+    }
+
+    fn call(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.match_token(&[TokenType::LeftParen]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr, ParseError> {
+        let mut args = Vec::new();
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if args.len() >= 255 {
+                    return Err(ParseError {
+                        token: self.peek().clone(),
+                        msg: "Can't have more than 255 arguments".to_string(),
+                    });
+                }
+                args.push(self.equality()?);
+                if !self.match_token(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        let paren = self.consume(TokenType::RightParen, "Expect ')' after arguments")?;
+
+        Ok(Expr::Call {
+            callee: Box::new(callee),
+            paren,
+            args,
+        })
     }
 
     /* error boundaries:

@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use crate::callable::Callable;
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum TokenType {
     LeftParen,
@@ -51,12 +53,13 @@ pub enum TokenType {
 }
 
 // i've seen this implementation in the wild
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum LiteralType {
     String(String),
     Number(f64),
     Bool(bool),
     Nil,
+    Callable(Callable),
 }
 
 impl LiteralType {
@@ -76,6 +79,7 @@ impl Display for LiteralType {
             LiteralType::Number(v) => write!(f, "{v:.2}"),
             LiteralType::Bool(v) => write!(f, "{v}"),
             LiteralType::Nil => write!(f, "nil"),
+            LiteralType::Callable(c) => write!(f, "<fn {c}>"),
         }
     }
 }

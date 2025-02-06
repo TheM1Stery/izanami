@@ -12,6 +12,11 @@ pub enum Expr {
         op: Token,
         right: Box<Expr>,
     },
+    Call {
+        callee: Box<Expr>,
+        paren: Token,
+        args: Vec<Expr>,
+    },
     Grouping {
         expression: Box<Expr>,
     },
@@ -36,6 +41,7 @@ pub enum Expr {
     },
 }
 
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Block {
         statements: Vec<Stmt>,
@@ -44,6 +50,11 @@ pub enum Stmt {
     Expression {
         expression: Expr,
     },
+    Function {
+        name: Token,
+        params: Vec<Token>,
+        body: Vec<Stmt>,
+    },
     If {
         condition: Expr,
         then_branch: Box<Stmt>,
@@ -51,6 +62,10 @@ pub enum Stmt {
     },
     Print {
         expression: Expr,
+    },
+    Return {
+        keyword: Token,
+        value: Option<Expr>,
     },
     Var {
         name: Token,

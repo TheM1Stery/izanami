@@ -13,6 +13,7 @@ use scanner::Scanner;
 use token::TokenType;
 
 mod ast;
+mod callable;
 mod environment;
 mod interpreter;
 mod parser;

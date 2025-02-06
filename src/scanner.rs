@@ -273,6 +273,8 @@ fn get_identified_keyword(identifier: &str) -> Option<TokenType> {
 
 #[cfg(test)]
 mod tests {
+    use crate::interpreter::is_equal;
+
     use super::*;
     use TokenType::*;
 
@@ -325,7 +327,10 @@ mod tests {
 
         let expected = LiteralType::String("salam!".to_string());
 
-        assert_eq!(expected, actual.literal.as_ref().unwrap().clone());
+        assert!(is_equal(
+            &expected,
+            &actual.literal.as_ref().unwrap().clone(),
+        ))
     }
 
     #[test]
@@ -375,7 +380,10 @@ mod tests {
 
         let actual_value = &token.literal;
 
-        assert_eq!(expected_value, actual_value.as_ref().unwrap().clone())
+        assert!(is_equal(
+            &expected_value,
+            &actual_value.as_ref().unwrap().clone()
+        ))
     }
 
     #[test]
@@ -398,6 +406,9 @@ mod tests {
 
         let actual_value = &token.literal;
 
-        assert_eq!(expected_value, actual_value.as_ref().unwrap().clone())
+        assert!(is_equal(
+            &expected_value,
+            &actual_value.as_ref().unwrap().clone()
+        ))
     }
 }

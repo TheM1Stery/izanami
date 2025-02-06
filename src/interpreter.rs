@@ -1,16 +1,28 @@
 use core::panic;
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use crate::{
     ast::{Expr, Stmt},
+    callable::{Callable, CallableTrait, NativeFunction},
     environment::Environment,
     token::{LiteralType, Token, TokenType},
 };
+
+type InterpreterResult = Result<LiteralType, InterpreterSignal>;
 
 #[derive(Debug)]
 pub struct RuntimeError {
     pub token: Token,
     pub message: String,
+}
+
+pub struct InterpreterEnvironment {
+    pub globals: Rc<RefCell<Environment>>,
+    pub environment: Rc<RefCell<Environment>>,
 }
 
 impl RuntimeError {
@@ -22,22 +34,29 @@ impl RuntimeError {
     }
 }
 
-pub enum InterpreterError {
+pub enum InterpreterSignal {
     RuntimeError(RuntimeError),
-    BreakSignal,
+    Break,
+    Return(LiteralType),
 }
+/*
+    This two impl blocks are for the ? operator. I'm too lazy to write the wrapping code for the enums and it also looks ugly,
+    so i just abuse the ? operator lol
+    Instead of InterpreterError::RuntimeError(RuntimeError {...} ) i can just RuntimeError {...}? to turn it into a InterpreterError
+*/
 
-impl From<RuntimeError> for InterpreterError {
+impl From<RuntimeError> for InterpreterSignal {
     fn from(value: RuntimeError) -> Self {
         Self::RuntimeError(value)
     }
 }
 
-impl From<InterpreterError> for RuntimeError {
-    fn from(value: InterpreterError) -> Self {
+impl From<InterpreterSignal> for RuntimeError {
+    fn from(value: InterpreterSignal) -> Self {
         match value {
-            InterpreterError::RuntimeError(runtime_error) => runtime_error,
-            InterpreterError::BreakSignal => panic!("Not a runtime error"),
+            InterpreterSignal::RuntimeError(runtime_error) => runtime_error,
+            InterpreterSignal::Break => panic!("Not a runtime error"),
+            InterpreterSignal::Return(_) => panic!("Not a runtime error"),
         }
     }
 }
@@ -45,9 +64,30 @@ impl From<InterpreterError> for RuntimeError {
 pub fn interpret(
     statements: &Vec<Stmt>,
     environment: &Rc<RefCell<Environment>>,
-) -> Result<(), InterpreterError> {
+) -> Result<(), InterpreterSignal> {
+    let clock = |_arg: &[LiteralType]| {
+        Ok(LiteralType::Number(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs_f64()
+                / 1000.0,
+        ))
+    };
+
+    let clock_function = NativeFunction::new("clock".to_string(), 0, clock);
+    let environment = InterpreterEnvironment {
+        globals: Rc::clone(environment),
+        environment: Rc::clone(environment),
+    };
+    environment.globals.borrow_mut().define(
+        "clock",
+        Some(LiteralType::Callable(Callable::NativeFunction(
+            clock_function,
+        ))),
+    );
     for statement in statements {
-        execute(statement, environment)?;
+        execute(statement, &environment)?
     }
 
     Ok(())
@@ -55,23 +95,24 @@ pub fn interpret(
 
 fn execute(
     statement: &Stmt,
-    environment: &Rc<RefCell<Environment>>,
-) -> Result<(), InterpreterError> {
+    environment: &InterpreterEnvironment,
+) -> Result<(), InterpreterSignal> {
+    let curr_environment = &environment.environment;
     match statement {
         Stmt::Expression { expression } => {
-            evaluate(expression, &mut environment.borrow_mut())?;
+            evaluate(expression, environment)?;
         }
         Stmt::Print { expression } => {
-            let expr = evaluate(expression, &mut environment.borrow_mut())?;
+            let expr = evaluate(expression, environment)?;
             println!("{expr}");
         }
         Stmt::Var { name, initializer } => {
             let value = if let Some(initializer) = initializer {
-                Some(evaluate(initializer, &mut environment.borrow_mut())?)
+                Some(evaluate(initializer, environment)?)
             } else {
                 None
             };
-            environment.borrow_mut().define(&name.lexeme, value);
+            curr_environment.borrow_mut().define(&name.lexeme, value);
         }
         Stmt::Block { statements } => {
             execute_block(statements, environment)?;
@@ -81,39 +122,69 @@ fn execute(
             then_branch,
             else_branch,
         } => {
-            if is_truthy(&evaluate(condition, &mut environment.borrow_mut())?) {
+            if is_truthy(&evaluate(condition, environment)?) {
                 execute(then_branch, environment)?;
             } else if let Some(else_branch) = else_branch {
                 execute(else_branch, environment)?;
             }
         }
         Stmt::While { condition, body } => {
-            while is_truthy(&evaluate(condition, &mut environment.borrow_mut())?) {
+            while is_truthy(&evaluate(condition, environment)?) {
                 let result = execute(body, environment);
                 if result.is_err() {
                     break;
                 }
             }
         }
-        Stmt::Break => Err(InterpreterError::BreakSignal)?,
+        Stmt::Break => Err(InterpreterSignal::Break)?,
+        Stmt::Function { name, params, body } => {
+            let function = Callable::Function {
+                name: Box::new(name.clone()),
+                body: body.to_vec(),
+                params: params.to_vec(),
+                closure: Rc::clone(curr_environment),
+            };
+            environment
+                .globals
+                .borrow_mut()
+                .define(&name.lexeme, Some(LiteralType::Callable(function)));
+        }
+        Stmt::Return { value, .. } => {
+            let value = if let Some(v) = value {
+                evaluate(v, environment)?
+            } else {
+                LiteralType::Nil
+            };
+
+            return Err(InterpreterSignal::Return(value));
+        }
     }
 
     Ok(())
 }
 
-fn execute_block(
+pub fn execute_block(
     statements: &Vec<Stmt>,
-    environment: &Rc<RefCell<Environment>>,
-) -> Result<(), InterpreterError> {
-    let block_enviroment = Rc::new(RefCell::new(Environment::with_enclosing(environment)));
+    environment: &InterpreterEnvironment,
+) -> Result<(), InterpreterSignal> {
+    let block_enviroment = Rc::new(RefCell::new(Environment::with_enclosing(
+        &environment.environment,
+    )));
+    // we just move the block_enviroment to a new InterpreterEnvironment and clone the reference to
+    // globals, bcs outer environments might have the globals reference
+    let environment = InterpreterEnvironment {
+        globals: Rc::clone(&environment.globals),
+        environment: block_enviroment,
+    };
     for stmt in statements {
-        execute(stmt, &block_enviroment)?;
+        execute(stmt, &environment)?;
     }
 
     Ok(())
 }
 
-fn evaluate(expr: &Expr, environment: &mut Environment) -> Result<LiteralType, InterpreterError> {
+fn evaluate(expr: &Expr, environment: &InterpreterEnvironment) -> InterpreterResult {
+    let curr_environment = &environment.environment;
     match expr {
         Expr::Ternary {
             first,
@@ -129,7 +200,8 @@ fn evaluate(expr: &Expr, environment: &mut Environment) -> Result<LiteralType, I
         Expr::Grouping { expression } => evaluate(expression, environment),
         Expr::Literal { value } => Ok(value.clone()),
         Expr::Unary { op, right } => Ok(unary(&evaluate(right, environment)?, op)),
-        Expr::Variable { name } => environment
+        Expr::Variable { name } => curr_environment
+            .borrow()
             .get(name)
             .ok_or_else(|| RuntimeError {
                 token: name.clone(),
@@ -141,10 +213,11 @@ fn evaluate(expr: &Expr, environment: &mut Environment) -> Result<LiteralType, I
                     message: format!("Uninitialized variable {}.", name.lexeme),
                 })
             })
-            .map_err(InterpreterError::RuntimeError),
+            .map_err(InterpreterSignal::RuntimeError),
         Expr::Assign { name, value } => {
             let value = evaluate(value, environment)?;
-            environment
+            curr_environment
+                .borrow_mut()
                 .assign(name, value.clone())
                 .map_err(|_| RuntimeError {
                     token: name.clone(),
@@ -166,6 +239,38 @@ fn evaluate(expr: &Expr, environment: &mut Environment) -> Result<LiteralType, I
 
             evaluate(right, environment)
         }
+        Expr::Call {
+            callee,
+            paren,
+            args,
+        } => {
+            let callee_result = evaluate(callee, environment)?;
+
+            let mut arguments = Vec::new();
+            for arg in args {
+                arguments.push(evaluate(arg, environment)?);
+            }
+
+            match callee_result {
+                LiteralType::Callable(function) => {
+                    if arguments.len() as u8 != function.arity() {
+                        Err(RuntimeError {
+                            token: paren.clone(),
+                            message: format!(
+                                "Expected {} arguments but got {}.",
+                                function.arity(),
+                                args.len()
+                            ),
+                        })?
+                    }
+                    Ok(function.call(&arguments, environment)?)
+                }
+                _ => Err(RuntimeError {
+                    token: paren.clone(),
+                    message: "Can only call functions and classes".to_string(),
+                })?,
+            }
+        }
     }
 }
 
@@ -173,8 +278,8 @@ fn ternary(
     first: &Expr,
     second: &Expr,
     third: &Expr,
-    environment: &mut Environment,
-) -> Result<LiteralType, InterpreterError> {
+    environment: &InterpreterEnvironment,
+) -> InterpreterResult {
     let first = evaluate(first, environment)?;
     if is_truthy(&first) {
         return evaluate(second, environment);
@@ -182,11 +287,7 @@ fn ternary(
     evaluate(third, environment)
 }
 
-fn binary(
-    left: &LiteralType,
-    right: &LiteralType,
-    op: &Token,
-) -> Result<LiteralType, InterpreterError> {
+fn binary(left: &LiteralType, right: &LiteralType, op: &Token) -> InterpreterResult {
     use LiteralType::{Bool, Number, String};
     use TokenType::{
         BangEqual, Comma, EqualEqual, Greater, GreaterEqual, Less, LessEqual, Minus, Plus, Slash,
@@ -232,10 +333,14 @@ fn is_truthy(literal: &LiteralType) -> bool {
     }
 }
 
-fn is_equal(left: &LiteralType, right: &LiteralType) -> bool {
+pub fn is_equal(left: &LiteralType, right: &LiteralType) -> bool {
     match (left, right) {
         (LiteralType::Nil, LiteralType::Nil) => true,
         (LiteralType::Nil, _) => false,
-        _ => left == right,
+        // i could've implemeneted PartialEq but it doesn't make sense for every LiteralType
+        (LiteralType::String(s), LiteralType::String(s2)) => s == s2,
+        (LiteralType::Number(n1), LiteralType::Number(n2)) => n1 == n2,
+        (LiteralType::Bool(t1), LiteralType::Bool(t2)) => t1 == t2,
+        _ => false,
     }
 }

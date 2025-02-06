@@ -9,6 +9,7 @@ pub fn pretty_print(expr: &Expr) -> String {
             LiteralType::Number(v) => v.to_string(),
             LiteralType::Bool(v) => v.to_string(),
             LiteralType::Nil => "Nil".to_string(),
+            LiteralType::Callable(_) => todo!(),
         },
         Expr::Unary { op, right } => parenthesize(&op.lexeme, &[right]),
         Expr::Ternary {
@@ -19,6 +20,11 @@ pub fn pretty_print(expr: &Expr) -> String {
         Expr::Variable { name } => name.lexeme.clone(),
         Expr::Assign { name, value } => parenthesize(&name.lexeme, &[value]),
         Expr::Logical { left, op, right } => parenthesize(&op.lexeme, &[left, right]),
+        Expr::Call {
+            callee: _,
+            paren: _,
+            args: _,
+        } => todo!(),
     }
 }
 
