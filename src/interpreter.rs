@@ -16,7 +16,7 @@ type InterpreterResult = Result<LiteralType, InterpreterSignal>;
 
 #[derive(Debug)]
 pub struct RuntimeError {
-    pub token: Option<Token>,
+    pub token: Token,
     pub message: String,
 }
 
@@ -28,14 +28,7 @@ pub struct InterpreterEnvironment {
 impl RuntimeError {
     pub fn new(token: &Token, message: String) -> Self {
         RuntimeError {
-            token: Some(token.clone()),
-            message: message.to_string(),
-        }
-    }
-
-    pub fn no_token(message: String) -> Self {
-        RuntimeError {
-            token: None,
+            token: token.clone(),
             message: message.to_string(),
         }
     }
@@ -43,6 +36,7 @@ impl RuntimeError {
 
 pub enum InterpreterSignal {
     RuntimeError(RuntimeError),
+    NativeRuntimeError { msg: String },
     Break,
     Return(LiteralType),
 }
@@ -64,6 +58,7 @@ impl From<InterpreterSignal> for RuntimeError {
             InterpreterSignal::RuntimeError(runtime_error) => runtime_error,
             InterpreterSignal::Break => panic!("Not a runtime error"),
             InterpreterSignal::Return(_) => panic!("Not a runtime error"),
+            InterpreterSignal::NativeRuntimeError { .. } => panic!("Not a runtime error"),
         }
     }
 }
@@ -270,7 +265,17 @@ fn evaluate(expr: &Expr, environment: &InterpreterEnvironment) -> InterpreterRes
                             ),
                         ))?
                     }
-                    Ok(function.call(&arguments, environment)?)
+                    let call_result = function.call(&arguments, environment).map_err(|x| match x {
+                        InterpreterSignal::NativeRuntimeError { msg } => {
+                            InterpreterSignal::RuntimeError(RuntimeError {
+                                token: paren.clone(),
+                                message: msg,
+                            })
+                        }
+                        _ => x,
+                    });
+
+                    Ok(call_result?)
                 }
                 _ => Err(RuntimeError::new(
                     paren,
@@ -358,7 +363,11 @@ fn read_input_function() -> NativeFunction {
         let mut buf = String::new();
         io::stdin()
             .read_line(&mut buf)
-            .map_err(|_| RuntimeError::no_token("Error reading from stdin".to_string()))?;
+            .map_err(|_| InterpreterSignal::NativeRuntimeError {
+                msg: "Error reading from stdin".to_string(),
+            })?;
+
+        buf.truncate(buf.trim_end().len());
 
         Ok(LiteralType::String(buf))
     };

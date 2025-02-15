@@ -276,7 +276,7 @@ impl Parser<'_> {
             None
         };
 
-        self.consume(TokenType::Semicolon, "Expect ';' after return value.");
+        self.consume(TokenType::Semicolon, "Expect ';' after return value.")?;
 
         Ok(Stmt::Return { keyword, value })
     }
