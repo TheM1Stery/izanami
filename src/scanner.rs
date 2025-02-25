@@ -72,6 +72,7 @@ impl Scanner {
         Ok(&self.tokens)
     }
 
+    #[allow(dead_code)]
     fn is_at_end(&self) -> bool {
         self.current >= self.source.len()
     }

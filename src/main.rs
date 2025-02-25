@@ -22,7 +22,7 @@ fn main() -> ExitCode {
                 return ExitCode::from(75);
             }
 
-            if let Err(RunError::RuntimeError(r)) = result {
+            if let Err(RunError::RuntimeError(_r)) = result {
                 return ExitCode::from(70);
             }
 

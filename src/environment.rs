@@ -1,9 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{
-    callable::Callable,
-    token::{LiteralType, Token},
-};
+use crate::token::{LiteralType, Token};
 
 #[derive(Debug, Clone)]
 pub struct Environment {

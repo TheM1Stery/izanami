@@ -1,5 +1,6 @@
 use crate::{ast::Expr, token::LiteralType};
 
+#[allow(dead_code)]
 pub fn pretty_print(expr: &Expr) -> String {
     match expr {
         Expr::Binary { left, op, right } => parenthesize(&op.lexeme, &[left, right]),

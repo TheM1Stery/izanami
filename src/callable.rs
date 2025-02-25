@@ -3,7 +3,7 @@ use std::{cell::RefCell, fmt::Display, rc::Rc};
 use crate::{
     ast::Stmt,
     environment::Environment,
-    interpreter::{execute_block, InterpreterEnvironment, InterpreterSignal, RuntimeError},
+    interpreter::{execute_block, InterpreterEnvironment, InterpreterSignal},
     token::{LiteralType, Token},
 };
 
