@@ -13,22 +13,19 @@ fn main() -> ExitCode {
         Ordering::Equal => {
             let result = run_file(args[1].to_str().unwrap());
 
-            if let Err(RunError::FileReadError(e)) = result {
-                println!("Couldn't read the file. Reason: {}", e);
-                return ExitCode::from(1);
-            }
-            if let Err(RunError::OtherError(e)) = result {
-                println!("Error occured. Error: {}", e);
-                return ExitCode::from(75);
-            }
-
-            if let Err(RunError::RuntimeError(_r)) = result {
-                return ExitCode::from(70);
-            }
-
-            if let Err(RunError::ParseError) = result {
-                return ExitCode::from(75);
-            }
+            return match result {
+                Err(RunError::FileReadError(e)) => {
+                    println!("Couldn't read the file. Reason: {}", e);
+                    return ExitCode::from(1);
+                }
+                Err(RunError::OtherError(e)) => {
+                    println!("Error occured. Error: {}", e);
+                    return ExitCode::from(75);
+                }
+                Err(RunError::RuntimeError(_)) => ExitCode::from(70),
+                Err(RunError::ParseError) => ExitCode::from(75),
+                Ok(_) => ExitCode::SUCCESS,
+            };
         }
         Ordering::Less => {
             let result = run_prompt();
