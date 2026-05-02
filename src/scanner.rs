@@ -1,9 +1,9 @@
 use std::{fmt::Display, iter::Peekable, mem, str::Chars};
 
 use crate::{
+    RloxError,
     token::{LiteralType, Token, TokenType},
     utils::StringUtils,
-    RloxError,
 };
 
 pub struct Scanner {
@@ -150,12 +150,8 @@ impl Scanner {
 
     fn add_token_literal(&mut self, t_type: TokenType, literal: Option<LiteralType>) {
         let text = self.source.slice(self.start..self.current);
-        self.tokens.push(Token {
-            t_type,
-            lexeme: text.to_string(),
-            literal,
-            line: self.line,
-        });
+        let token = Token::new(t_type, text, literal, self.line);
+        self.tokens.push(token);
     }
 
     fn peek(&mut self) -> Option<char> {

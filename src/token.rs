@@ -3,6 +3,7 @@ use std::fmt::Display;
 use crate::callable::Callable;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum TokenType {
     LeftParen,
     RightParen,
@@ -88,7 +89,7 @@ impl Display for LiteralType {
 pub struct Token {
     pub t_type: TokenType,
     pub lexeme: String,
-    pub literal: Option<LiteralType>,
+    pub literal: Option<Box<LiteralType>>,
     pub line: usize,
 }
 
@@ -98,7 +99,7 @@ impl Token {
         Self {
             t_type,
             lexeme,
-            literal,
+            literal: literal.map(Box::new),
             line,
         }
     }

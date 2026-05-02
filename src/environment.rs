@@ -41,10 +41,10 @@ impl Environment {
             .map(|l| *l = Some(val))
             .ok_or(EnvironmentError::AssignError);
 
-        if assigned.is_err() {
-            if let Some(enclosing) = &mut self.enclosing {
-                return enclosing.borrow_mut().assign(name, cloned);
-            }
+        if assigned.is_err()
+            && let Some(enclosing) = &mut self.enclosing
+        {
+            return enclosing.borrow_mut().assign(name, cloned);
         }
 
         assigned
@@ -55,10 +55,10 @@ impl Environment {
 
         let value = self.values.get(&name.lexeme);
 
-        if value.is_none() {
-            if let Some(enclosing) = &self.enclosing {
-                return enclosing.borrow().get(name);
-            }
+        if value.is_none()
+            && let Some(enclosing) = &self.enclosing
+        {
+            return enclosing.borrow().get(name);
         }
 
         value.cloned()

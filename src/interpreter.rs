@@ -321,11 +321,18 @@ fn binary(left: &LiteralType, right: &LiteralType, op: &Token) -> InterpreterRes
         (Slash, Number(left), Number(right)) => Ok(Number(left / right)),
         (Star, Number(left), Number(right)) => Ok(Number(left * right)),
         /* comma operator discard the left operand, so we just return the evaluation of the right operand */
-        (Comma, _,_) => Ok(right.clone()),
-        (Greater | GreaterEqual | Less | LessEqual | Minus | Slash | Star, _, _) => Err(RuntimeError::new(op, "Operands must be numbers".to_string()))?,
-        (Plus, _, _) => Err(RuntimeError::new(op, "Operands must be two numbers or two strings".to_string()))?,
+        (Comma, _, _) => Ok(right.clone()),
+        (Greater | GreaterEqual | Less | LessEqual | Minus | Slash | Star, _, _) => Err(
+            RuntimeError::new(op, "Operands must be numbers".to_string()),
+        )?,
+        (Plus, _, _) => Err(RuntimeError::new(
+            op,
+            "Operands must be two numbers or two strings".to_string(),
+        ))?,
 
-        _ => unreachable!("Shouldn't happen. Expr::Binary for evaluate. Some case is a binary operation that wasn't matched")
+        _ => unreachable!(
+            "Shouldn't happen. Expr::Binary for evaluate. Some case is a binary operation that wasn't matched"
+        ),
     }
 }
 

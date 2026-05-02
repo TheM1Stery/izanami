@@ -3,7 +3,7 @@ use std::fmt::Display;
 use crate::{
     ast::{Expr, Stmt},
     token::{LiteralType, Token, TokenType},
-    utils::{defer, expr, ScopeCall},
+    utils::{ScopeCall, defer, expr},
 };
 
 pub struct Parser<'a> {
@@ -467,7 +467,8 @@ impl Parser<'_> {
 
         if self.match_token(&[TokenType::Number, TokenType::String]) {
             return Ok(create_literal(
-                self.previous()
+                *self
+                    .previous()
                     .literal
                     .clone()
                     .expect("The number and string token should have a literal"),
